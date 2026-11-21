@@ -329,6 +329,8 @@
   const MIN_X = 40, MAX_X = 366;
   const TIP = 48;             // 집게 머리 ~ 집게 끝 거리
   const BATTLE_TIME = 120;    // 배틀 시간(초)
+  // 배틀 보상: 이긴 팀 = 기본 10 + 이긴 팀이 뽑은 인형 1개당 2 / 무승부 = 5 (인형을 1개 이상 뽑았을 때)
+  const BATTLE_WIN_GEMS = 10, BATTLE_GEMS_PER_DOLL = 2, BATTLE_TIE_GEMS = 5;
 
   // 큰 순서대로: 크기, 기본 보석
   const RADII = [42, 35, 29, 23, 18];
@@ -1216,7 +1218,7 @@
   $('openGacha').onclick = () => { buildGacha(); showIdleGacha(); updateHud(); openModal('gachaModal'); };
 
   // ================= 2인 배틀 =================
-  const battle = { active: false, phase: 'off', time: BATTLE_TIME, count: 0, lastBeep: null, scores: [0, 0], machines: [] };
+  const battle = { active: false, phase: 'off', time: BATTLE_TIME, count: 0, lastBeep: null, scores: [0, 0], machines: [], round: 0 };
   const TEAM = [{ name: '핑크팀', color: '#ff5fa2' }, { name: '블루팀', color: '#4d8dff' }];
   function initBattleMachines() {
     if (battle.machines.length) return;
@@ -1235,6 +1237,7 @@
     battle.time = BATTLE_TIME;
     battle.count = 3;
     battle.lastBeep = null;
+    battle.round++;
     battle.phase = 'countdown';
     battle.active = true;
     $('score0').textContent = '0'; $('score1').textContent = '0';
@@ -1289,20 +1292,29 @@
         battle.machines.forEach(m => { m.locked = true; m.keys.left = m.keys.right = false; });
         Sound.buzzer();
         showOverlay(`<div class="bcount" style="font-size:64px">TIME UP!</div>`);
-        setTimeout(showResult, 1800);
+        const round = battle.round;
+        setTimeout(() => showResult(round), 1800);
       }
     }
   }
-  function showResult() {
-    if (!battle.active) return;
+  function showResult(round) {
+    if (!battle.active || round !== battle.round) return;
     const [a, b] = battle.scores;
     const win = a === b ? -1 : a > b ? 0 : 1;
     const title = win < 0 ? '무승부!' : `🏆 <span style="color:${TEAM[win].color}">${TEAM[win].name}</span> 승리!`;
+    // 보상 지급
+    const gems = win < 0 ? (a > 0 ? BATTLE_TIE_GEMS : 0) : BATTLE_WIN_GEMS + battle.scores[win] * BATTLE_GEMS_PER_DOLL;
+    if (gems > 0) { save.gems += gems; persist(); updateHud(); }
+    const rewardHtml = gems > 0
+      ? `<div class="reward">${win < 0 ? '둘 다 잘했어요!' : `${TEAM[win].name} 보상`} +${gems} 💎</div>
+         <div class="sub" style="margin:-8px 0 14px">${win < 0 ? '무승부 보상' : `승리 ${BATTLE_WIN_GEMS} + 뽑은 인형 ${battle.scores[win]}개 × ${BATTLE_GEMS_PER_DOLL}`}</div>`
+      : `<div class="sub" style="margin-bottom:14px">인형을 뽑아야 보석을 받을 수 있어요!</div>`;
     Sound.fanfare();
     showOverlay(`<div class="panel result">
       <div style="font-size:52px">${win < 0 ? '🤝' : '🎉'}</div>
       <h2>${title}</h2>
       <div class="fs"><span style="color:${TEAM[0].color}">핑크팀 ${a}개</span><span>:</span><span style="color:${TEAM[1].color}">블루팀 ${b}개</span></div>
+      ${rewardHtml}
       <div class="btns">
         <button class="big-btn battle" id="again">다시 대결!</button>
         <button class="big-btn" id="leave" style="background:#9a8fb0">나가기</button>
