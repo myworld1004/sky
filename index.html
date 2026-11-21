@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>뽑기마스터</title>
+<style>
+  :root {
+    --bg1: #ffe3f1;
+    --bg2: #e6dcff;
+    --ink: #3b2a4a;
+    --pink: #ff5fa2;
+    --purple: #8b5cf6;
+    --card: #ffffffdd;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: linear-gradient(160deg, var(--bg1), var(--bg2));
+    color: var(--ink);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+    display: flex; justify-content: center;
+    user-select: none; -webkit-user-select: none;
+  }
+  #app { width: 100%; max-width: 440px; padding: 12px 16px 28px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  h1 {
+    margin: 0; font-size: 30px; letter-spacing: -1px;
+    background: linear-gradient(90deg, var(--pink), var(--purple));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 2px 0 #fff;
+  }
+  .stats { display: flex; gap: 6px; }
+  .pill {
+    background: var(--card); border-radius: 999px; padding: 6px 12px;
+    font-weight: 800; font-size: 14px; box-shadow: 0 2px 6px #0001;
+  }
+  .machine-wrap { position: relative; }
+  canvas#cv {
+    width: 100%; aspect-ratio: 400 / 560; display: block;
+    border-radius: 22px; box-shadow: 0 10px 24px #8b5cf633;
+    touch-action: none;
+  }
+  .toast {
+    position: absolute; left: 50%; top: 18%; transform: translate(-50%, 0) scale(.8);
+    background: #3b2a4add; color: #fff; padding: 10px 18px; border-radius: 14px;
+    font-weight: 800; font-size: 18px; opacity: 0; transition: .25s; pointer-events: none;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  .controls { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 10px; margin: 12px 0 8px; }
+  .controls button {
+    height: 64px; border: 0; border-radius: 18px; font-size: 26px; font-weight: 900;
+    color: #fff; cursor: pointer; touch-action: none;
+    box-shadow: 0 5px 0 #0002; transition: transform .05s;
+  }
+  .controls button:active, .controls button.on { transform: translateY(3px); box-shadow: 0 2px 0 #0002; }
+  #left, #right { background: linear-gradient(#7cc4ff, #4d8dff); }
+  #drop { background: linear-gradient(#ff8cc0, var(--pink)); font-size: 24px; }
+  #drop:disabled { filter: grayscale(.7); opacity: .7; }
+  .info {
+    text-align: center; font-size: 13px; font-weight: 700; opacity: .85; margin-bottom: 10px;
+  }
+  .legend {
+    background: var(--card); border-radius: 16px; padding: 10px 12px; margin-bottom: 12px;
+    box-shadow: 0 2px 8px #0001;
+  }
+  .legend h3 { margin: 0 0 6px; font-size: 14px; }
+  .legend .row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+  .legend .dot { border-radius: 50%; flex: none; border: 2px solid #0002; }
+  .legend .dotbox { width: 34px; display: flex; justify-content: center; }
+  .legend .gem { margin-left: auto; font-weight: 900; }
+  .big-btn {
+    width: 100%; height: 56px; border: 0; border-radius: 18px; cursor: pointer;
+    background: linear-gradient(90deg, #ffb020, #ff5fa2, #8b5cf6);
+    color: #fff; font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 #0002;
+  }
+  .big-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #0002; }
+  .big-btn:disabled { filter: grayscale(.8); opacity: .6; cursor: default; }
+  .hint { text-align: center; font-size: 12px; opacity: .6; margin-top: 10px; }
+
+  .modal {
+    position: fixed; inset: 0; background: #2a1a3a99; display: flex;
+    align-items: center; justify-content: center; padding: 16px; z-index: 10;
+  }
+  .modal.hidden { display: none; }
+  .panel {
+    background: #fff; border-radius: 24px; width: 100%; max-width: 420px;
+    max-height: 92vh; overflow: auto; padding: 18px 16px; text-align: center;
+    box-shadow: 0 20px 40px #0003;
+  }
+  .clear-title {
+    font-size: 34px; font-weight: 900; margin: 6px 0;
+    background: linear-gradient(90deg, #ffb020, #ff5fa2, #8b5cf6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: pop .6s ease;
+  }
+  @keyframes pop { 0% { transform: scale(.3); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  .reward { font-size: 22px; font-weight: 900; margin: 8px 0 14px; }
+  .sub { font-size: 14px; opacity: .75; }
+  .shop-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .shop-head h2 { margin: 0; font-size: 22px; }
+  .x { border: 0; background: #eee; border-radius: 50%; width: 34px; height: 34px; font-size: 18px; cursor: pointer; }
+  .rates { font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: 6px 0 10px; }
+  .rates span { padding: 3px 8px; border-radius: 999px; color: #fff; font-weight: 800; }
+  .stage-area {
+    height: 190px; display: flex; align-items: center; justify-content: center; flex-direction: column;
+    background: radial-gradient(circle at 50% 40%, #fff6fb, #f1e9ff); border-radius: 18px; margin-bottom: 10px;
+  }
+  .capsule {
+    width: 90px; height: 90px; border-radius: 50%;
+    background: linear-gradient(#ff7eb6 50%, #fff 50%); border: 5px solid #3b2a4a;
+    position: relative;
+  }
+  .capsule::after { content: ""; position: absolute; left: -5px; right: -5px; top: 37px; height: 6px; background: #3b2a4a; }
+  .capsule.shake { animation: shake .12s infinite; }
+  @keyframes shake { 0% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } 100% { transform: rotate(-12deg); } }
+  .reveal { animation: pop .5s ease; }
+  .reveal .rar { display: inline-block; color: #fff; font-weight: 900; padding: 3px 10px; border-radius: 999px; font-size: 13px; }
+  .reveal .nm { font-weight: 900; font-size: 18px; margin-top: 4px; }
+  .reveal .tag { font-size: 13px; font-weight: 800; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin-top: 12px; }
+  .cell {
+    border-radius: 14px; padding: 4px 2px 6px; border: 3px solid transparent; cursor: pointer;
+    background: #f7f3ff; font-size: 11px; font-weight: 800; position: relative;
+  }
+  .cell.locked { cursor: default; opacity: .55; }
+  .cell.eq { border-color: var(--pink); background: #fff0f7; }
+  .cell canvas { width: 64px; height: 72px; display: block; margin: 0 auto; }
+  .cell .r { font-size: 10px; }
+  .cell .eqb { position: absolute; top: 3px; right: 4px; font-size: 10px; color: var(--pink); }
+  .count { font-size: 13px; font-weight: 800; margin-top: 12px; text-align: left; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>뽑기마스터</h1>
+    <div class="stats">
+      <span class="pill" id="stageLbl">STAGE 1</span>
+      <span class="pill" id="gemLbl">💎 0</span>
+    </div>
+  </header>
+
+  <div class="machine-wrap">
+    <canvas id="cv"></canvas>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="controls">
+    <button id="left" aria-label="왼쪽">◀</button>
+    <button id="drop">뽑기!</button>
+    <button id="right" aria-label="오른쪽">▶</button>
+  </div>
+  <div class="info">집게 힘: <b>중간</b> · 시도 <span id="tries">0</span>회 · 장착 스킨: <span id="skinName"></span></div>
+
+  <div class="legend">
+    <h3>🎁 이번 스테이지 인형 (클수록 보석이 많아요!)</h3>
+    <div id="legendRows"></div>
+  </div>
+
+  <button class="big-btn" id="openShop">✨ 집게 스킨 뽑기</button>
+  <div class="hint">PC: ← → 로 이동, 스페이스로 뽑기 · 진행 상황은 자동 저장돼요</div>
+</div>
+
+<!-- 스테이지 클리어 -->
+<div class="modal hidden" id="clearModal">
+  <div class="panel">
+    <div style="font-size:48px">🎉</div>
+    <div class="clear-title" id="clearTitle">STAGE 1 클리어!</div>
+    <canvas id="clearDoll" width="140" height="140" style="width:120px;height:120px"></canvas>
+    <div class="sub" id="clearDollName"></div>
+    <div class="reward" id="clearReward">+6 💎</div>
+    <button class="big-btn" id="nextStage">다음 스테이지 ▶</button>
+  </div>
+</div>
+
+<!-- 스킨 뽑기 -->
+<div class="modal hidden" id="shopModal">
+  <div class="panel">
+    <div class="shop-head">
+      <h2>✨ 집게 스킨 뽑기</h2>
+      <button class="x" id="closeShop">✕</button>
+    </div>
+    <div class="pill" style="display:inline-block" id="shopGems">💎 0</div>
+    <div class="rates" id="rates"></div>
+    <div class="stage-area" id="gachaStage"></div>
+    <button class="big-btn" id="pullBtn">뽑기 (💎 25)</button>
+    <div class="sub" style="margin-top:6px">뽑을 때마다 필요한 보석이 1개씩 늘어나요</div>
+    <div class="count" id="collCount"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------------- 기본 설정 ----------------
+  const W = 400, H = 560;
+  const RAIL_Y = 34;          // 레일 높이
+  const FLOOR = 505;          // 기계 바닥
+  const WALL_X = 100;         // 배출구 벽 x
+  const WALL_TOP = 440;       // 배출구 벽 윗부분
+  const RIGHT_X = 388;        // 오른쪽 유리벽
+  const HOME_X = 54;          // 집게 시작 위치(배출구 위)
+  const REST_Y = 72;          // 집게 대기 높이
+  const MIN_X = 40, MAX_X = 366;
+  const TIP = 48;             // 집게 머리 ~ 집게 끝 거리
+
+  // 큰 순서대로: 크기, 기본 보석
+  const RADII = [42, 35, 29, 23, 18];
+  const BASE_GEMS = [6, 5, 4, 2, 1];
+  const SIZE_NAMES = ['초대형', '대형', '중형', '소형', '미니'];
+  // 집게 힘 "중간": 잡을 확률 / 끝까지 버틸 확률 (큰 인형일수록 어려움)
+  const GRAB = [0.52, 0.60, 0.68, 0.75, 0.82];
+  const HOLD = [0.42, 0.50, 0.58, 0.66, 0.74];
+
+  const KINDS = [
+    { kind: 'bear',  name: '곰돌이', color: '#c8915a' },
+    { kind: 'bunny', name: '토끼',   color: '#f8d7e6' },
+    { kind: 'cat',   name: '고양이', color: '#f4b860' },
+    { kind: 'chick', name: '병아리', color: '#ffe066' },
+    { kind: 'pig',   name: '돼지',   color: '#ffb3c6' },
+    { kind: 'frog',  name: '개구리', color: '#8fd16a' },
+    { kind: 'panda', name: '판다',   color: '#f7f7f7' },
+    { kind: 'bear',  name: '하늘곰', color: '#9fd3ff' },
+    { kind: 'cat',   name: '보라냥', color: '#c9a7ff' },
+  ];
+
+  // ---------------- 스킨 ----------------
+  const RARITIES = {
+    R:   { name: '레어',       color: '#4d8dff', w: 50 },
+    RR:  { name: '레어레어',   color: '#2fb866', w: 28 },
+    BR:  { name: '빅레어',     color: '#8b5cf6', w: 15 },
+    SR:  { name: '슈퍼레어',   color: '#ff9f1a', w: 5 },
+    SSR: { name: '슈슈퍼레어', color: '#ff3d7f', w: 2 },
+  };
+  const SKINS = [
+    { id: 'basic', name: '기본 집게',     rar: null,  body: '#b8c0cc', arm: '#8a94a3', accent: '#e8edf3' },
+    { id: 'r1',  name: '빨강 집게',       rar: 'R',   body: '#ff6161', arm: '#d63b3b', accent: '#ffc2c2' },
+    { id: 'r2',  name: '파랑 집게',       rar: 'R',   body: '#5b97ff', arm: '#2f63c9', accent: '#c7dbff' },
+    { id: 'r3',  name: '초록 집게',       rar: 'R',   body: '#4fcf74', arm: '#2c9a4c', accent: '#c9f5d5' },
+    { id: 'r4',  name: '노랑 집게',       rar: 'R',   body: '#ffd23f', arm: '#d9a300', accent: '#fff3c2' },
+    { id: 'r5',  name: '보라 집게',       rar: 'R',   body: '#a77bff', arm: '#7444d6', accent: '#e4d6ff' },
+    { id: 'rr1', name: '딸기우유 집게',   rar: 'RR',  body: '#ffa3cb', arm: '#ff5f9e', accent: '#ffffff', fx: 'dots' },
+    { id: 'rr2', name: '민트초코 집게',   rar: 'RR',  body: '#7fe3c9', arm: '#5b3a29', accent: '#3d2519', fx: 'dots' },
+    { id: 'rr3', name: '노을 집게',       rar: 'RR',  body: '#ff9a3c', arm: '#ff4f7b', accent: '#ffe08a', fx: 'sunset' },
+    { id: 'rr4', name: '솜사탕 구름 집게', rar: 'RR', body: '#cfe9ff', arm: '#ffb6e1', accent: '#ffffff', fx: 'dots' },
+    { id: 'br1', name: '황금 집게',       rar: 'BR',  body: '#ffd54a', arm: '#c99a00', accent: '#fff6c9', fx: 'glow', glow: '#ffe066' },
+    { id: 'br2', name: '크리스탈 집게',   rar: 'BR',  body: '#bdf3ff', arm: '#7fd8f0', accent: '#ffffff', fx: 'crystal', glow: '#aef0ff' },
+    { id: 'br3', name: '불꽃 집게',       rar: 'BR',  body: '#ff7a1a', arm: '#e62e00', accent: '#ffd36b', fx: 'fire', glow: '#ff6a00' },
+    { id: 'sr1', name: '무지개 집게',     rar: 'SR',  body: '#ff0000', arm: '#ff0000', accent: '#ffffff', fx: 'rainbow' },
+    { id: 'ssr1', name: '은하수 집게',    rar: 'SSR', body: '#2b1a5e', arm: '#4b2fa8', accent: '#ffe8ff', fx: 'galaxy', glow: '#b48cff' },
+  ];
+  const skinById = id => SKINS.find(s => s.id === id) || SKINS[0];
+
+  // ---------------- 저장 ----------------
+  const SAVE_KEY = 'ppopki-master-v1';
+  let save = { gems: 0, stage: 1, pulls: 0, owned: ['basic'], equip: 'basic' };
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s && typeof s === 'object') save = Object.assign(save, s);
+  } catch (e) { /* 저장소 사용 불가 */ }
+  function persist() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* 무시 */ }
+  }
+  const skinCost = () => 25 + save.pulls;
+  const dollGems = rank => BASE_GEMS[rank] + (save.stage - 1);
+
+  // ---------------- 캔버스 ----------------
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const DPR = Math.min(window.devicePixelRatio || 1, 3);
+  cv.width = W * DPR; cv.height = H * DPR;
+  ctx.scale(DPR, DPR);
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  function shade(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    const t = amt < 0 ? 0 : 255, p = Math.abs(amt);
+    r = Math.round(r + (t - r) * p); g = Math.round(g + (t - g) * p); b = Math.round(b + (t - b) * p);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  // ---------------- 인형 ----------------
+  let dolls = [];
+  function restY(d, x) {
+    if (x < WALL_X) return H + 300;              // 배출구로 쏙!
+    let y = FLOOR - d.r;
+    for (const o of dolls) {
+      if (o === d || o.held || o.gone) continue;
+      if (o.y < d.y - 1) continue;              // 아래에 있는 인형만 받침
+      const dx = Math.abs(o.x - x), R = d.r + o.r - 2;
+      if (dx < R) {
+        const yy = o.y - Math.sqrt(R * R - dx * dx);
+        if (yy < y) y = yy;
+      }
+    }
+    return y;
+  }
+
+  function newStage() {
+    const kinds = shuffle(KINDS.slice()).slice(0, 5);
+    dolls = [];
+    // 큰 인형부터 무작위 위치에 쌓기
+    for (const rank of [0, 1, 2, 3, 4]) { // 큰 것부터 바닥에 깔리도록
+      const r = RADII[rank];
+      const d = { rank, r, kind: kinds[rank].kind, name: kinds[rank].name, color: kinds[rank].color,
+                  x: 0, y: -999, vy: 0, tx: null, held: false, gone: false, wobble: rand(0, 6) };
+      let best = null;
+      for (let i = 0; i < 14; i++) {
+        const x = rand(WALL_X + 8 + r, RIGHT_X - 4 - r);
+        const y = restY(d, x);
+        const score = y + rand(0, 40);
+        if (!best || score > best.score) best = { x, y, score };
+      }
+      d.x = best.x; d.y = best.y;
+      dolls.push(d);
+    }
+    claw.x = HOME_X; claw.y = REST_Y; claw.open = 1; claw.state = 'idle'; claw.held = null;
+    tries = 0;
+    stageCleared = false;
+    updateHud();
+    buildLegend();
+  }
+
+  function drawDoll(c, d, x, y) {
+    const r = d.r, col = d.color, dark = shade(col, -0.35), mid = shade(col, -0.12);
+    c.save();
+    c.translate(x, y);
+    c.lineWidth = 2; c.strokeStyle = dark;
+    const circ = (cx, cy, rr, fill, stroke = true) => {
+      c.beginPath(); c.arc(cx, cy, rr, 0, Math.PI * 2); c.fillStyle = fill; c.fill(); if (stroke) c.stroke();
+    };
+    const ell = (cx, cy, rx, ry, fill, rot = 0, stroke = true) => {
+      c.beginPath(); c.ellipse(cx, cy, rx, ry, rot, 0, Math.PI * 2); c.fillStyle = fill; c.fill(); if (stroke) c.stroke();
+    };
+    const tri = (pts, fill) => {
+      c.beginPath(); c.moveTo(pts[0], pts[1]); c.lineTo(pts[2], pts[3]); c.lineTo(pts[4], pts[5]); c.closePath();
+      c.fillStyle = fill; c.fill(); c.stroke();
+    };
+    // 귀 (몸 뒤)
+    switch (d.kind) {
+      case 'bear':
+        circ(-r * 0.66, -r * 0.68, r * 0.32, col); circ(r * 0.66, -r * 0.68, r * 0.32, col);
+        circ(-r * 0.66, -r * 0.68, r * 0.16, mid, false); circ(r * 0.66, -r * 0.68, r * 0.16, mid, false);
+        break;
+      case 'panda':
+        circ(-r * 0.66, -r * 0.68, r * 0.32, '#333'); circ(r * 0.66, -r * 0.68, r * 0.32, '#333');
+        break;
+      case 'bunny':
+        ell(-r * 0.36, -r * 1.05, r * 0.2, r * 0.55, col, -0.15); ell(r * 0.36, -r * 1.05, r * 0.2, r * 0.55, col, 0.15);
+        ell(-r * 0.36, -r * 1.02, r * 0.09, r * 0.38, '#ff9fc4', -0.15, false); ell(r * 0.36, -r * 1.02, r * 0.09, r * 0.38, '#ff9fc4', 0.15, false);
+        break;
+      case 'cat':
+        tri([-r * 0.85, -r * 0.35, -r * 0.65, -r * 1.05, -r * 0.2, -r * 0.8], col);
+        tri([r * 0.85, -r * 0.35, r * 0.65, -r * 1.05, r * 0.2, -r * 0.8], col);
+        break;
+      case 'pig':
+        tri([-r * 0.8, -r * 0.45, -r * 0.75, -r * 0.98, -r * 0.3, -r * 0.82], mid);
+        tri([r * 0.8, -r * 0.45, r * 0.75, -r * 0.98, r * 0.3, -r * 0.82], mid);
+        break;
+      case 'frog':
+        circ(-r * 0.45, -r * 0.72, r * 0.32, col); circ(r * 0.45, -r * 0.72, r * 0.32, col);
+        break;
+      case 'chick':
+        c.beginPath(); c.moveTo(0, -r * 0.95); c.quadraticCurveTo(-r * 0.15, -r * 1.3, -r * 0.05, -r * 1.35);
+        c.moveTo(0, -r * 0.95); c.quadraticCurveTo(r * 0.2, -r * 1.25, r * 0.22, -r * 1.3); c.stroke();
+        break;
+    }
+    // 몸
+    const g = c.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r);
+    g.addColorStop(0, shade(col, 0.35)); g.addColorStop(1, col);
+    circ(0, 0, r, g);
+    // 얼굴
+    const ink = '#2b1f33';
+    if (d.kind === 'panda') {
+      ell(-r * 0.34, -r * 0.08, r * 0.2, r * 0.25, '#333', -0.4, false);
+      ell(r * 0.34, -r * 0.08, r * 0.2, r * 0.25, '#333', 0.4, false);
+      circ(-r * 0.32, -r * 0.1, r * 0.08, '#fff', false); circ(r * 0.32, -r * 0.1, r * 0.08, '#fff', false);
+      circ(-r * 0.32, -r * 0.1, r * 0.045, ink, false); circ(r * 0.32, -r * 0.1, r * 0.045, ink, false);
+    } else if (d.kind === 'frog') {
+      circ(-r * 0.45, -r * 0.72, r * 0.18, '#fff', false); circ(r * 0.45, -r * 0.72, r * 0.18, '#fff', false);
+      circ(-r * 0.45, -r * 0.7, r * 0.09, ink, false); circ(r * 0.45, -r * 0.7, r * 0.09, ink, false);
+    } else {
+      circ(-r * 0.32, -r * 0.1, r * 0.1, ink, false); circ(r * 0.32, -r * 0.1, r * 0.1, ink, false);
+      circ(-r * 0.29, -r * 0.14, r * 0.035, '#fff', false); circ(r * 0.35, -r * 0.14, r * 0.035, '#fff', false);
+    }
+    // 볼터치
+    c.globalAlpha = 0.55;
+    ell(-r * 0.55, r * 0.18, r * 0.14, r * 0.08, '#ff7aa8', 0, false);
+    ell(r * 0.55, r * 0.18, r * 0.14, r * 0.08, '#ff7aa8', 0, false);
+    c.globalAlpha = 1;
+    // 입
+    c.strokeStyle = ink; c.lineWidth = Math.max(1.5, r * 0.06);
+    switch (d.kind) {
+      case 'bear': case 'panda':
+        ell(0, r * 0.25, r * 0.26, r * 0.19, d.kind === 'panda' ? '#fff' : shade(col, 0.45), 0, false);
+        ell(0, r * 0.17, r * 0.09, r * 0.06, ink, 0, false);
+        c.beginPath(); c.moveTo(0, r * 0.22); c.lineTo(0, r * 0.32); c.stroke();
+        break;
+      case 'pig':
+        ell(0, r * 0.22, r * 0.25, r * 0.17, shade(col, -0.15));
+        ell(-r * 0.09, r * 0.22, r * 0.04, r * 0.07, ink, 0, false); ell(r * 0.09, r * 0.22, r * 0.04, r * 0.07, ink, 0, false);
+        break;
+      case 'chick':
+        c.lineWidth = 1.5; c.strokeStyle = '#c96a00';
+        tri([-r * 0.16, r * 0.1, r * 0.16, r * 0.1, 0, r * 0.32], '#ff9d2e');
+        break;
+      case 'frog':
+        c.beginPath(); c.arc(0, r * 0.05, r * 0.4, 0.2 * Math.PI, 0.8 * Math.PI); c.stroke();
+        break;
+      default: // cat, bunny: ω
+        c.beginPath();
+        c.arc(-r * 0.09, r * 0.15, r * 0.09, 0, Math.PI);
+        c.arc(r * 0.09, r * 0.15, r * 0.09, 0, Math.PI);
+        c.stroke();
+        if (d.kind === 'cat') {
+          c.lineWidth = 1.2;
+          c.beginPath();
+          c.moveTo(-r * 0.62, r * 0.02); c.lineTo(-r * 0.95, -r * 0.05);
+          c.moveTo(-r * 0.62, r * 0.12); c.lineTo(-r * 0.95, r * 0.15);
+          c.moveTo(r * 0.62, r * 0.02); c.lineTo(r * 0.95, -r * 0.05);
+          c.moveTo(r * 0.62, r * 0.12); c.lineTo(r * 0.95, r * 0.15);
+          c.stroke();
+        }
+    }
+    c.restore();
+  }
+
+  // ---------------- 집게 ----------------
+  const claw = { x: HOME_X, y: REST_Y, open: 1, openTarget: 1, state: 'idle', held: null, plan: null, t: 0, target: null, grabbed: false };
+  let tries = 0;
+  let stageCleared = false;
+  const keys = { left: false, right: false };
+
+  function clawColors(skin, t, part) {
+    if (skin.fx === 'rainbow') {
+      const h = (t * 140 + (part === 'arm' ? 60 : 0)) % 360;
+      return `hsl(${h},95%,60%)`;
+    }
+    return part === 'arm' ? skin.arm : skin.body;
+  }
+
+  // 집게 그리기 (게임/미리보기 공용)
+  function drawClaw(c, x, y, open, skin, t, cableTop) {
+    const s = 8 + 38 * open;
+    c.save();
+    // 케이블
+    c.strokeStyle = '#555'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(x, cableTop); c.lineTo(x, y - 14); c.stroke();
+
+    if (skin.fx === 'glow' || skin.fx === 'fire' || skin.fx === 'crystal' || skin.fx === 'galaxy') {
+      c.shadowColor = skin.glow; c.shadowBlur = skin.fx === 'fire' ? 12 + Math.sin(t * 12) * 5 : 14;
+    }
+    if (skin.fx === 'rainbow') { c.shadowColor = clawColors(skin, t, 'body'); c.shadowBlur = 14; }
+    if (skin.fx === 'crystal') c.globalAlpha = 0.85;
+
+    // 팔
+    const armCol = clawColors(skin, t, 'arm');
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    for (const sd of [-1, 1]) {
+      c.strokeStyle = armCol; c.lineWidth = 6;
+      c.beginPath();
+      c.moveTo(x + sd * 9, y + 4);
+      c.lineTo(x + sd * (s + 6), y + TIP * 0.55);
+      c.lineTo(x + sd * s * 0.72, y + TIP);
+      c.lineTo(x + sd * (s * 0.72 - 9), y + TIP - 3);
+      c.stroke();
+      if (skin.fx === 'crystal' || skin.fx === 'galaxy') {
+        c.strokeStyle = '#ffffffaa'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(x + sd * 9, y + 4); c.lineTo(x + sd * (s + 6), y + TIP * 0.55); c.stroke();
+      }
+    }
+    // 머리
+    let bodyFill;
+    if (skin.fx === 'sunset') {
+      bodyFill = c.createLinearGradient(x, y - 16, x, y + 10);
+      bodyFill.addColorStop(0, '#ffd36b'); bodyFill.addColorStop(0.5, '#ff9a3c'); bodyFill.addColorStop(1, '#ff4f7b');
+    } else if (skin.fx === 'galaxy') {
+      bodyFill = c.createLinearGradient(x - 16, y - 16, x + 16, y + 10);
+      bodyFill.addColorStop(0, '#1a0f40'); bodyFill.addColorStop(0.5, '#5a2ca0'); bodyFill.addColorStop(1, '#1b3f8f');
+    } else if (skin.fx === 'fire') {
+      bodyFill = c.createLinearGradient(x, y + 10, x, y - 16);
+      bodyFill.addColorStop(0, '#ff2d00'); bodyFill.addColorStop(1, '#ffb000');
+    } else if (skin.fx === 'crystal') {
+      bodyFill = c.createLinearGradient(x - 16, y - 16, x + 16, y + 10);
+      bodyFill.addColorStop(0, '#ffffff'); bodyFill.addColorStop(0.5, '#bdf3ff'); bodyFill.addColorStop(1, '#e3d4ff');
+    } else {
+      bodyFill = clawColors(skin, t, 'body');
+    }
+    c.fillStyle = bodyFill;
+    c.strokeStyle = skin.fx === 'rainbow' ? '#fff' : shade(skin.arm, -0.3); c.lineWidth = 2;
+    c.beginPath();
+    c.roundRect ? c.roundRect(x - 16, y - 16, 32, 26, 8) : c.rect(x - 16, y - 16, 32, 26);
+    c.fill(); c.stroke();
+    c.shadowBlur = 0;
+    // 장식
+    c.fillStyle = skin.accent;
+    if (skin.fx === 'dots') {
+      for (const [dx, dy] of [[-8, -9], [5, -6], [-3, 2], [9, 3]]) { c.beginPath(); c.arc(x + dx, y + dy, 2.2, 0, Math.PI * 2); c.fill(); }
+    } else {
+      c.fillRect(x - 11, y - 12, 22, 4);
+    }
+    // 가운데 보석 버튼
+    c.beginPath(); c.arc(x, y + 1, 4, 0, Math.PI * 2);
+    c.fillStyle = skin.rar ? RARITIES[skin.rar].color : '#ff5fa2'; c.fill();
+    c.globalAlpha = 1;
+
+    // 반짝이 효과
+    if (skin.fx === 'galaxy' || skin.fx === 'crystal' || skin.fx === 'glow' || skin.fx === 'rainbow') {
+      const n = skin.fx === 'galaxy' ? 6 : 3;
+      for (let i = 0; i < n; i++) {
+        const a = t * (1.2 + i * 0.3) + i * 2.1;
+        const px = x + Math.cos(a) * (22 + i * 3), py = y + 12 + Math.sin(a * 1.3) * 22;
+        const sz = 1.5 + 1.5 * Math.abs(Math.sin(t * 4 + i));
+        c.fillStyle = skin.fx === 'galaxy' ? (i % 2 ? '#fff' : '#ffd6ff') : '#fff';
+        star(c, px, py, sz);
+      }
+    }
+    if (skin.fx === 'fire') {
+      for (let i = 0; i < 4; i++) {
+        const p = (t * 1.6 + i / 4) % 1;
+        c.globalAlpha = 1 - p;
+        c.fillStyle = i % 2 ? '#ffb000' : '#ff4500';
+        c.beginPath(); c.arc(x + Math.sin(i * 7 + t * 5) * 10, y - 16 - p * 22, 3 * (1 - p) + 1, 0, Math.PI * 2); c.fill();
+      }
+      c.globalAlpha = 1;
+    }
+    c.restore();
+  }
+  function star(c, x, y, s) {
+    c.beginPath();
+    c.moveTo(x, y - s * 2); c.lineTo(x + s * 0.5, y - s * 0.5); c.lineTo(x + s * 2, y);
+    c.lineTo(x + s * 0.5, y + s * 0.5); c.lineTo(x, y + s * 2); c.lineTo(x - s * 0.5, y + s * 0.5);
+    c.lineTo(x - s * 2, y); c.lineTo(x - s * 0.5, y - s * 0.5); c.closePath(); c.fill();
+  }
+
+  // 집게 아래 닿는 높이
+  function contactY(x) {
+    let y = x < WALL_X + 6 ? WALL_TOP - 4 : FLOOR;
+    for (const d of dolls) {
+      if (d.gone || d.held) continue;
+      const dx = Math.abs(d.x - x);
+      let s = null;
+      if (dx < d.r) s = d.y - Math.sqrt(d.r * d.r - dx * dx) + d.r * 0.35;
+      else if (dx < d.r + 12) s = d.y;
+      if (s !== null && s < y) y = s;
+    }
+    return y;
+  }
+  function pickTarget(x) {
+    let best = null, bestS = Infinity;
+    for (const d of dolls) {
+      if (d.gone || d.held) continue;
+      const dx = Math.abs(d.x - x);
+      if (dx < d.r * 0.92) {
+        const s = d.y - Math.sqrt(d.r * d.r - dx * dx);
+        if (s < bestS) { bestS = s; best = d; }
+      }
+    }
+    return best;
+  }
+
+  function dropClaw() {
+    if (claw.state !== 'idle' || stageCleared) return;
+    claw.state = 'down';
+    tries++;
+    updateHud();
+  }
+
+  function decideGrab() {
+    const d = pickTarget(claw.x);
+    claw.target = d; claw.grabbed = false; claw.plan = 'none';
+    if (!d) return;
+    const align = 1 - 0.75 * Math.min(1, Math.abs(d.x - claw.x) / d.r);
+    if (Math.random() < GRAB[d.rank] * align) {
+      claw.grabbed = true;
+      if (Math.random() < HOLD[d.rank]) claw.plan = 'none';
+      else if (Math.random() < 0.5) { claw.plan = 'lift'; claw.dropY = rand(REST_Y + 10, claw.y - 15); }
+      else { claw.plan = 'carry'; claw.dropX = rand(HOME_X + 10, Math.max(HOME_X + 12, claw.x - 5)); }
+    }
+  }
+
+  function release(msg) {
+    const d = claw.held;
+    if (!d) return;
+    d.held = false; d.vy = 0;
+    if (d.x < WALL_X) d.tx = Math.max(10 + d.r, Math.min(d.x, WALL_X - d.r - 3));
+    else d.tx = Math.min(RIGHT_X - d.r, Math.max(d.x, WALL_X + d.r + 3));
+    claw.held = null;
+    claw.openTarget = 1;
+    if (msg && d.x >= WALL_X) toast(msg);
+  }
+
+  function updateClaw(k, t) {
+    const c = claw;
+    switch (c.state) {
+      case 'idle':
+        c.openTarget = 1;
+        if (keys.left) c.x -= 2.4 * k;
+        if (keys.right) c.x += 2.4 * k;
+        c.x = Math.max(MIN_X, Math.min(MAX_X, c.x));
+        break;
+      case 'down': {
+        c.y += 2.6 * k;
+        const cy = contactY(c.x);
+        if (c.y + TIP >= cy) {
+          c.y = Math.max(REST_Y, cy - TIP);
+          c.state = 'close'; c.t = 0;
+          decideGrab();
+          if (c.grabbed) c.openTarget = Math.max(0.15, (c.target.r * 1.1 - 8) / 38);
+          else {
+            c.openTarget = 0.05;
+            if (c.target) { // 살짝 밀어내기
+              const tg = c.target;
+              tg.tx = Math.min(RIGHT_X - tg.r, Math.max(WALL_X + tg.r + 3, tg.x + (tg.x > c.x ? 1 : -1) * rand(4, 12)));
+            }
+          }
+        }
+        break;
+      }
+      case 'close':
+        c.t += k / 60;
+        if (c.t > 0.6) {
+          if (c.grabbed) { c.held = c.target; c.held.held = true; }
+          c.state = 'up';
+        }
+        break;
+      case 'up':
+        c.y -= 2 * k;
+        if (c.held && c.plan === 'lift' && c.y < c.dropY) release('앗! 미끄러졌다 😭');
+        if (c.y <= REST_Y) { c.y = REST_Y; c.state = 'carry'; }
+        break;
+      case 'carry':
+        c.x -= 2.2 * k;
+        if (c.held && c.plan === 'carry' && c.x < c.dropX) release('으악, 떨어졌다! 😵');
+        if (c.x <= HOME_X) { c.x = HOME_X; c.state = 'open'; c.t = 0; c.openTarget = 1; }
+        break;
+      case 'open':
+        c.t += k / 60;
+        if (c.held) release();
+        if (c.t > 0.6) {
+          c.state = 'idle';
+          if (!stageCleared && !dolls.some(d => d.gone || d.x < WALL_X) && c.target === null) toast('허공을 잡았어요 🙈');
+          else if (!stageCleared && !dolls.some(d => d.x < WALL_X) && !c.grabbed && c.target) toast('아깝다! 다시 도전! 💪');
+        }
+        break;
+    }
+    c.open += (c.openTarget - c.open) * Math.min(1, 0.2 * k);
+
+    // 잡힌 인형 따라오기
+    if (c.held) {
+      const d = c.held;
+      const tx = c.x, ty = c.y + TIP - d.r * 0.2;
+      d.x += (tx - d.x) * Math.min(1, 0.25 * k);
+      d.y += (ty - d.y) * Math.min(1, 0.25 * k);
+    }
+  }
+
+  function updateDolls(k) {
+    for (const d of dolls) {
+      if (d.gone || d.held) continue;
+      if (d.tx !== null) {
+        d.x += (d.tx - d.x) * Math.min(1, 0.15 * k);
+        if (Math.abs(d.tx - d.x) < 0.3) { d.x = d.tx; d.tx = null; }
+      }
+      const rest = restY(d, d.x);
+      if (d.y < rest - 0.5) {
+        d.vy += 0.5 * k; d.y += d.vy * k;
+        if (d.y >= rest) { d.y = rest; d.vy = 0; }
+      } else d.vy = 0;
+      if (d.y > H + d.r + 10 && !d.gone) { d.gone = true; win(d); }
+    }
+  }
+
+  // ---------------- 클리어 ----------------
+  function win(d) {
+    if (stageCleared) return;
+    stageCleared = true;
+    const gems = dollGems(d.rank);
+    const clearedStage = save.stage;
+    save.gems += gems;
+    save.stage += 1;
+    persist();
+    setTimeout(() => {
+      document.getElementById('clearTitle').textContent = `STAGE ${clearedStage} 클리어!`;
+      document.getElementById('clearDollName').textContent = `${SIZE_NAMES[d.rank]} ${d.name} 획득!`;
+      const bonus = clearedStage - 1;
+      document.getElementById('clearReward').innerHTML =
+        `+${gems} 💎` + (bonus > 0 ? `<div class="sub">기본 ${BASE_GEMS[d.rank]} + 스테이지 보너스 ${bonus}</div>` : '');
+      const cc = document.getElementById('clearDoll').getContext('2d');
+      cc.clearRect(0, 0, 140, 140);
+      const scale = 46 / d.r;
+      cc.save(); cc.translate(70, 78); cc.scale(scale, scale);
+      drawDoll(cc, d, 0, 0); cc.restore();
+      document.getElementById('clearModal').classList.remove('hidden');
+      updateHud();
+    }, 500);
+  }
+  document.getElementById('nextStage').onclick = () => {
+    document.getElementById('clearModal').classList.add('hidden');
+    newStage();
+  };
+
+  // ---------------- 그리기 ----------------
+  function drawMachine(t) {
+    const c = ctx;
+    // 몸체
+    const body = c.createLinearGradient(0, 0, W, H);
+    body.addColorStop(0, '#ff8cc0'); body.addColorStop(1, '#a77bff');
+    c.fillStyle = body; c.fillRect(0, 0, W, H);
+    // 유리 안쪽
+    const glass = c.createLinearGradient(0, 20, 0, FLOOR);
+    glass.addColorStop(0, '#e9f6ff'); glass.addColorStop(1, '#fdeefe');
+    c.fillStyle = glass;
+    c.fillRect(8, 20, W - 16, FLOOR - 20);
+    // 뒷벽 무늬
+    c.fillStyle = '#ffffff55';
+    for (let i = 0; i < 8; i++) {
+      c.beginPath(); c.arc(40 + i * 48, 140 + (i % 2) * 70, 10, 0, Math.PI * 2); c.fill();
+    }
+    // 레일
+    c.fillStyle = '#5c4a6e'; c.fillRect(8, RAIL_Y - 6, W - 16, 8);
+    c.fillStyle = '#8f7aa3'; c.fillRect(8, RAIL_Y - 6, W - 16, 3);
+    // 바닥
+    c.fillStyle = '#f3c6e0'; c.fillRect(WALL_X, FLOOR, W - 8 - WALL_X, H - FLOOR);
+    c.fillStyle = '#e3a9cb'; c.fillRect(WALL_X, FLOOR, W - 8 - WALL_X, 6);
+    // 배출구
+    c.fillStyle = '#3b2a4a'; c.fillRect(8, FLOOR, WALL_X - 8, H - FLOOR);
+    c.fillStyle = '#ffd23f'; c.font = 'bold 16px sans-serif'; c.textAlign = 'center';
+    c.fillText('OUT', (8 + WALL_X) / 2, FLOOR + 32);
+    // 화살표 표시
+    c.fillStyle = '#ffffffaa';
+    const bob = Math.sin(t * 4) * 4;
+    c.beginPath(); c.moveTo(HOME_X - 10, WALL_TOP - 30 + bob); c.lineTo(HOME_X + 10, WALL_TOP - 30 + bob); c.lineTo(HOME_X, WALL_TOP - 16 + bob); c.fill();
+  }
+  function drawFront() {
+    const c = ctx;
+    // 배출구 유리벽
+    c.fillStyle = '#ffffff99'; c.fillRect(WALL_X - 3, WALL_TOP, 6, FLOOR - WALL_TOP);
+    c.fillStyle = '#ff5fa2'; c.fillRect(WALL_X - 5, WALL_TOP - 4, 10, 6);
+    // 유리 반사
+    c.fillStyle = '#ffffff30';
+    c.beginPath(); c.moveTo(30, 20); c.lineTo(70, 20); c.lineTo(20, 200); c.lineTo(8, 200); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(300, 20); c.lineTo(320, 20); c.lineTo(260, 260); c.lineTo(250, 260); c.closePath(); c.fill();
+    // 틀
+    c.strokeStyle = '#ffffff'; c.lineWidth = 3;
+    c.strokeRect(8, 20, W - 16, FLOOR - 20);
+    // 간판
+    c.fillStyle = '#3b2a4a';
+    c.beginPath(); c.roundRect ? c.roundRect(W / 2 - 70, 2, 140, 22, 10) : c.rect(W / 2 - 70, 2, 140, 22); c.fill();
+    c.fillStyle = '#ffd23f'; c.font = 'bold 14px sans-serif'; c.textAlign = 'center';
+    c.fillText('★ 뽑기마스터 ★', W / 2, 18);
+  }
+
+  function render(t) {
+    ctx.clearRect(0, 0, W, H);
+    drawMachine(t);
+    // 인형 (아래쪽 인형 먼저 그리고, 위에 쌓인 인형을 앞에)
+    const list = dolls.filter(d => !d.gone && !d.held).sort((a, b) => b.y - a.y);
+    for (const d of list) drawDoll(ctx, d, d.x, d.y);
+    // 집게 캐리지
+    ctx.fillStyle = '#3b2a4a'; ctx.fillRect(claw.x - 14, RAIL_Y - 9, 28, 12);
+    if (claw.held) drawDoll(ctx, claw.held, claw.held.x, claw.held.y);
+    drawClaw(ctx, claw.x, claw.y, claw.open, skinById(save.equip), t, RAIL_Y);
+    drawFront();
+    // 조준선
+    if (claw.state === 'idle' && !stageCleared) {
+      ctx.save();
+      ctx.strokeStyle = '#ff5fa266'; ctx.setLineDash([4, 6]); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(claw.x, claw.y + TIP + 4); ctx.lineTo(claw.x, contactY(claw.x)); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const k = dt * 60;
+    const t = now / 1000;
+    updateClaw(k, t);
+    updateDolls(k);
+    render(t);
+    if (!document.getElementById('shopModal').classList.contains('hidden')) renderPreviews(t);
+    requestAnimationFrame(loop);
+  }
+
+  // ---------------- HUD ----------------
+  const $ = id => document.getElementById(id);
+  function updateHud() {
+    $('stageLbl').textContent = `STAGE ${stageCleared ? save.stage - 1 : save.stage}`;
+    $('gemLbl').textContent = `💎 ${save.gems}`;
+    $('tries').textContent = tries;
+    $('skinName').textContent = skinById(save.equip).name;
+    $('drop').disabled = claw.state !== 'idle' && !stageCleared ? true : false;
+    $('shopGems').textContent = `💎 ${save.gems}`;
+    $('pullBtn').textContent = `뽑기 (💎 ${skinCost()})`;
+    $('pullBtn').disabled = save.gems < skinCost() || pulling;
+  }
+  function buildLegend() {
+    const rows = dolls.slice().sort((a, b) => a.rank - b.rank).map(d =>
+      `<div class="row"><span class="dotbox"><span class="dot" style="width:${d.r * 0.7}px;height:${d.r * 0.7}px;background:${d.color}"></span></span>
+       <span>${SIZE_NAMES[d.rank]} ${d.name}</span><span class="gem">💎 ${dollGems(d.rank)}</span></div>`).join('');
+    $('legendRows').innerHTML = rows;
+  }
+  let toastTimer = null;
+  function toast(msg) {
+    const el = $('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 1400);
+  }
+
+  // ---------------- 입력 ----------------
+  function hold(btn, key) {
+    const on = e => { e.preventDefault(); keys[key] = true; btn.classList.add('on'); };
+    const off = () => { keys[key] = false; btn.classList.remove('on'); };
+    btn.addEventListener('pointerdown', on);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, off));
+    btn.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  hold($('left'), 'left'); hold($('right'), 'right');
+  $('drop').addEventListener('click', dropClaw);
+  window.addEventListener('keydown', e => {
+    if (!$('shopModal').classList.contains('hidden') || !$('clearModal').classList.contains('hidden')) {
+      if (e.key === 'Enter' && !$('clearModal').classList.contains('hidden')) $('nextStage').click();
+      return;
+    }
+    if (e.key === 'ArrowLeft') keys.left = true;
+    else if (e.key === 'ArrowRight') keys.right = true;
+    else if (e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); dropClaw(); }
+  });
+  window.addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft') keys.left = false;
+    if (e.key === 'ArrowRight') keys.right = false;
+  });
+  setInterval(updateHud, 200);
+
+  // ---------------- 스킨 뽑기 ----------------
+  let pulling = false;
+  const previews = [];
+  function buildShop() {
+    $('rates').innerHTML = Object.values(RARITIES).map(r => `<span style="background:${r.color}">${r.name} ${r.w}%</span>`).join('');
+    const grid = $('grid');
+    grid.innerHTML = '';
+    previews.length = 0;
+    for (const s of SKINS) {
+      const owned = save.owned.includes(s.id);
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (owned ? '' : ' locked') + (save.equip === s.id ? ' eq' : '');
+      const rar = s.rar ? RARITIES[s.rar] : null;
+      cell.innerHTML = `${save.equip === s.id ? '<span class="eqb">장착중</span>' : ''}<canvas width="128" height="144"></canvas>
+        <div>${owned ? s.name : '???'}</div>
+        <div class="r" style="color:${rar ? rar.color : '#888'}">${rar ? rar.name : '기본'}</div>`;
+      const cnv = cell.querySelector('canvas');
+      previews.push({ cnv, skin: s, owned });
+      if (owned) cell.onclick = () => { save.equip = s.id; persist(); buildShop(); updateHud(); };
+      grid.appendChild(cell);
+    }
+    $('collCount').textContent = `📖 스킨 도감 ${save.owned.length} / ${SKINS.length}  (눌러서 장착)`;
+  }
+  function renderPreviews(t) {
+    for (const p of previews) drawPreview(p.cnv, p.skin, t, p.owned);
+    const rc = document.getElementById('revealCv');
+    if (rc && rc._skin) drawPreview(rc, rc._skin, t, true);
+  }
+  function drawPreview(cnv, skin, t, owned) {
+    const c = cnv.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, cnv.width, cnv.height);
+    c.scale(cnv.width / 64, cnv.width / 64);
+    if (!owned) {
+      c.fillStyle = '#c9c0d9'; c.font = 'bold 28px sans-serif'; c.textAlign = 'center';
+      c.fillText('?', 32, 46);
+      return;
+    }
+    c.translate(32, 0); c.scale(0.85, 0.85); c.translate(-32, 0);
+    drawClaw(c, 32, 30, 0.55 + Math.sin(t * 2) * 0.1, skin, t, 0);
+  }
+
+  function rollSkin() {
+    const total = Object.values(RARITIES).reduce((a, r) => a + r.w, 0);
+    let roll = Math.random() * total, key = 'R';
+    for (const [k, r] of Object.entries(RARITIES)) { if ((roll -= r.w) < 0) { key = k; break; } }
+    const pool = SKINS.filter(s => s.rar === key);
+    const fresh = pool.filter(s => !save.owned.includes(s.id));
+    const list = fresh.length ? fresh : pool;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function showIdleGacha() {
+    $('gachaStage').innerHTML = `<div class="capsule"></div><div class="sub" style="margin-top:10px">보석 ${skinCost()}개로 집게 스킨을 뽑아요!</div>`;
+  }
+
+  $('pullBtn').onclick = () => {
+    const cost = skinCost();
+    if (pulling || save.gems < cost) return;
+    pulling = true;
+    save.gems -= cost;
+    save.pulls += 1;
+    const skin = rollSkin();
+    const isNew = !save.owned.includes(skin.id);
+    if (isNew) save.owned.push(skin.id);
+    persist();
+    updateHud();
+    $('gachaStage').innerHTML = `<div class="capsule shake"></div><div class="sub" style="margin-top:10px">두근두근...</div>`;
+    setTimeout(() => {
+      const rar = RARITIES[skin.rar];
+      $('gachaStage').innerHTML = `<div class="reveal">
+        <canvas id="revealCv" width="128" height="144" style="width:80px;height:90px"></canvas>
+        <div><span class="rar" style="background:${rar.color}">${rar.name}</span></div>
+        <div class="nm">${skin.name}</div>
+        <div class="tag" style="color:${isNew ? '#ff3d7f' : '#888'}">${isNew ? 'NEW! 새 스킨 획득 🎉' : '이미 가진 스킨이에요'}</div>
+      </div>`;
+      $('revealCv')._skin = skin;
+      pulling = false;
+      buildShop();
+      updateHud();
+    }, 1200);
+  };
+  $('openShop').onclick = () => {
+    keys.left = keys.right = false;
+    buildShop(); showIdleGacha(); updateHud();
+    $('shopModal').classList.remove('hidden');
+  };
+  $('closeShop').onclick = () => $('shopModal').classList.add('hidden');
+  $('shopModal').addEventListener('click', e => { if (e.target.id === 'shopModal') $('shopModal').classList.add('hidden'); });
+
+  // ---------------- 시작 ----------------
+  newStage();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
