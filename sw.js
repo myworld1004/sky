@@ -1,5 +1,5 @@
 // 뽑기마스터 오프라인 지원 (인터넷 없이도 플레이)
-const CACHE = 'ppopki-master-v1';
+const CACHE = 'ppopki-master-v2';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
