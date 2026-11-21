@@ -79,13 +79,31 @@
   .legend .dot { border-radius: 50%; flex: none; border: 2px solid #0002; }
   .legend .dotbox { width: 34px; display: flex; justify-content: center; }
   .legend .gem { margin-left: auto; font-weight: 900; }
-  .menu { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .menu { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+  .big-btn.dex { background: linear-gradient(135deg, #ffb020, #ff7a45); }
+  /* 인형 도감 */
+  .dex-bar { height: 12px; background: #f1e9ff; border-radius: 999px; overflow: hidden; margin: 8px 0 4px; }
+  .dex-bar div { height: 100%; background: linear-gradient(90deg, #ffb020, #ff5fa2); border-radius: 999px; transition: width .4s; }
+  .dcell { background: #fff7ee; border-radius: 16px; padding: 6px 4px 8px; font-size: 12px; font-weight: 800; }
+  .dcell.locked { background: #f4f1f8; color: #9a8fb0; }
+  .dcell canvas { width: 70px; height: 70px; display: block; margin: 0 auto; }
+  .dcell .n { font-size: 11px; color: #ff5fa2; margin-top: 2px; }
+  .dcell .bd { font-size: 10px; margin-top: 2px; }
+  /* 출석 */
+  .att-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin: 14px 0; }
+  .att { background: #f7f3ff; border-radius: 14px; padding: 8px 2px; font-size: 12px; font-weight: 800; position: relative; border: 3px solid transparent; }
+  .att .g { font-size: 15px; margin-top: 3px; }
+  .att.big { grid-column: span 2; background: linear-gradient(135deg, #fff1c2, #ffd6ea); }
+  .att.big .g { font-size: 18px; }
+  .att.done { opacity: .55; }
+  .att.done::after { content: "✅"; position: absolute; right: 4px; top: 2px; font-size: 14px; }
+  .att.today { border-color: var(--pink); background: #fff0f7; animation: pop .8s ease infinite alternate; }
   .big-btn {
     width: 100%; min-height: 56px; border: 0; border-radius: 18px; cursor: pointer;
     background: linear-gradient(90deg, #ffb020, #ff5fa2, #8b5cf6);
     color: #fff !important; font-size: 19px; font-weight: 900; box-shadow: 0 5px 0 #0002; padding: 6px;
   }
-  .menu .big-btn { font-size: 15px; line-height: 1.25; }
+  .menu .big-btn { font-size: 13px; line-height: 1.3; padding: 6px 2px; }
   .big-btn.shop { background: linear-gradient(135deg, #2fb866, #12a3a3); }
   .big-btn.battle { background: linear-gradient(135deg, #ff5fa2, #4d8dff); }
   .big-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #0002; }
@@ -231,6 +249,7 @@
     <button class="big-btn" id="openGacha">✨<br>스킨 뽑기</button>
     <button class="big-btn shop" id="openShop">🛒<br>상점</button>
     <button class="big-btn battle" id="openBattle">⚔️<br>2인 배틀</button>
+    <button class="big-btn dex" id="openDex">🧸<br>인형 도감</button>
   </div>
   <div class="hint">PC: ← → (또는 A D) 이동, 스페이스로 뽑기<br>진행 상황은 자동 저장돼요</div>
 </div>
@@ -261,6 +280,31 @@
     <div class="sub" style="margin-top:6px">뽑을 때마다 필요한 보석이 1개씩 늘어나요</div>
     <div class="count" id="collCount"></div>
     <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<!-- 인형 도감 -->
+<div class="modal hidden" id="dexModal">
+  <div class="panel">
+    <div class="shop-head">
+      <h2>🧸 인형 도감</h2>
+      <button class="x" data-close="dexModal">✕</button>
+    </div>
+    <div class="sub" id="dexSub"></div>
+    <div class="dex-bar"><div id="dexFill"></div></div>
+    <div class="grid" id="dexGrid"></div>
+    <div class="sub" style="margin-top:12px">✨ 황금 인형은 보석 ×2, 🌈 무지개 인형은 보석 ×3!</div>
+  </div>
+</div>
+
+<!-- 출석 보상 -->
+<div class="modal hidden" id="attModal">
+  <div class="panel">
+    <div style="font-size:44px">🎁</div>
+    <h2 style="margin:4px 0">매일 출석 보상</h2>
+    <div class="sub" id="attSub"></div>
+    <div class="att-grid" id="attGrid"></div>
+    <button class="big-btn" id="attClaim">받기!</button>
   </div>
 </div>
 
@@ -352,6 +396,21 @@
     { kind: 'cat',   name: '보라냥', color: '#c9a7ff' },
   ];
 
+  // 특별한 인형: 황금 = 보석 ×2, 무지개 = 보석 ×3 (배틀에서는 2점, 3점)
+  const SPECIALS = {
+    gold:    { name: '황금',   icon: '✨', mult: 2, color: '#ffd23f' },
+    rainbow: { name: '무지개', icon: '🌈', mult: 3 },
+  };
+  const specialMult = d => (d.special ? SPECIALS[d.special].mult : 1);
+  const specialLabel = d => (d.special ? `${SPECIALS[d.special].icon}${SPECIALS[d.special].name} ` : '');
+  // 스테이지마다: 무지개 7%, 황금 20% 확률로 인형 하나가 특별해져요
+  const STAGE_RAINBOW = 0.07, STAGE_GOLD = 0.20;
+  // 배틀에서 새로 떨어지는 인형마다: 무지개 3%, 황금 8%
+  const SPAWN_RAINBOW = 0.03, SPAWN_GOLD = 0.08;
+
+  const DEX_BONUS = 50;                         // 도감 완성 보너스
+  const ATT_REWARDS = [5, 5, 10, 10, 15, 15, 50]; // 1~7일차 출석 보상
+
   const THEMES = {
     main: { a: '#ff8cc0', b: '#a77bff', sign: '★ 뽑기마스터 ★' },
     pink: { a: '#ffa8cf', b: '#ff4f97', sign: '1P 핑크팀' },
@@ -395,12 +454,15 @@
 
   // ---------------- 저장 ----------------
   const SAVE_KEY = 'ppopki-master-v1';
-  let save = { gems: 0, stage: 1, pulls: 0, owned: ['basic'], equip: 'basic', sound: true, boost: { mult: 1, until: 0 } };
+  let save = { gems: 0, stage: 1, pulls: 0, owned: ['basic'], equip: 'basic', sound: true, boost: { mult: 1, until: 0 },
+               dex: {}, dexDone: false, att: { last: '', streak: 0 } };
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
     if (s && typeof s === 'object') save = Object.assign(save, s);
   } catch (e) { /* 저장소 사용 불가 */ }
   if (!save.boost) save.boost = { mult: 1, until: 0 };
+  if (!save.dex) save.dex = {};
+  if (!save.att) save.att = { last: '', streak: 0 };
   function persist() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* 무시 */ }
   }
@@ -549,7 +611,24 @@
     }
     const g = c.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r);
     g.addColorStop(0, shade(col, 0.35)); g.addColorStop(1, col);
-    circ(0, 0, r, g);
+    const tt = performance.now() / 1000;
+    if (d.special) { c.save(); c.shadowColor = d.special === 'gold' ? '#ffe066' : '#ff8cf0'; c.shadowBlur = 16; circ(0, 0, r, g); c.restore(); }
+    else circ(0, 0, r, g);
+    if (d.special === 'rainbow') {
+      c.save();
+      c.beginPath(); c.arc(0, 0, r - 1, 0, Math.PI * 2); c.clip();
+      const rg = c.createLinearGradient(-r, -r, r, r);
+      for (let i = 0; i <= 6; i++) rg.addColorStop(i / 6, `hsl(${(i * 60 + tt * 120) % 360},90%,65%)`);
+      c.globalAlpha = 0.6; c.fillStyle = rg; c.fillRect(-r, -r, r * 2, r * 2);
+      c.restore();
+    } else if (d.special === 'gold') {
+      c.save();
+      c.beginPath(); c.arc(0, 0, r - 1, 0, Math.PI * 2); c.clip();
+      const sx = ((tt * 0.8) % 2) * r * 3 - r * 2;   // 반짝 지나가는 빛
+      c.globalAlpha = 0.55; c.fillStyle = '#fff';
+      c.beginPath(); c.moveTo(sx, -r); c.lineTo(sx + r * 0.35, -r); c.lineTo(sx - r * 0.25, r); c.lineTo(sx - r * 0.6, r); c.closePath(); c.fill();
+      c.restore();
+    }
     const ink = '#2b1f33';
     if (d.kind === 'panda') {
       ell(-r * 0.34, -r * 0.08, r * 0.2, r * 0.25, '#333', -0.4, false);
@@ -599,6 +678,14 @@
           c.moveTo(r * 0.62, r * 0.12); c.lineTo(r * 0.95, r * 0.15);
           c.stroke();
         }
+    }
+    if (d.special) {                                 // 반짝이 별
+      const tt2 = performance.now() / 1000;
+      for (let i = 0; i < 3; i++) {
+        const a = tt2 * 1.5 + i * 2.1;
+        c.fillStyle = d.special === 'gold' ? '#fff6b0' : `hsl(${(tt2 * 150 + i * 120) % 360},100%,75%)`;
+        star(c, Math.cos(a) * r * 1.1, Math.sin(a) * r * 1.0, 1.5 + 1.5 * Math.abs(Math.sin(tt2 * 4 + i)));
+      }
     }
     c.restore();
   }
@@ -727,8 +814,10 @@
     resetClaw() {
       Object.assign(this.claw, { x: HOME_X, y: REST_Y, open: 1, openTarget: 1, state: 'idle', held: null, plan: null, t: 0, target: null, grabbed: false });
     }
-    makeDoll(rank, k) {
-      return { rank, r: RADII[rank], kind: k.kind, name: k.name, color: k.color, x: 0, y: -999, vy: 0, tx: null, held: false, gone: false };
+    makeDoll(rank, k, special = null) {
+      return { rank, r: RADII[rank], kind: k.kind, name: k.name, special,
+               color: special === 'gold' ? SPECIALS.gold.color : k.color,
+               x: 0, y: -999, vy: 0, tx: null, held: false, gone: false };
     }
     fill() {
       const kinds = shuffle(KINDS.slice()).slice(0, 5);
@@ -745,6 +834,14 @@
         d.x = best.x; d.y = best.y;
         this.dolls.push(d);
       }
+      // 가끔 특별한 인형 등장!
+      const roll = Math.random();
+      const sp = roll < STAGE_RAINBOW ? 'rainbow' : roll < STAGE_RAINBOW + STAGE_GOLD ? 'gold' : null;
+      if (sp) {
+        const d = this.dolls[Math.floor(Math.random() * this.dolls.length)];
+        d.special = sp;
+        if (sp === 'gold') d.color = SPECIALS.gold.color;
+      }
       this.resetClaw();
       this.tries = 0;
     }
@@ -753,7 +850,9 @@
       this.dolls = this.dolls.filter(d => !d.gone);
       const used = new Set(this.dolls.map(d => d.name));
       const pool = KINDS.filter(k => !used.has(k.name));
-      const d = this.makeDoll(rank, pool[Math.floor(Math.random() * pool.length)]);
+      const roll = Math.random();
+      const sp = roll < SPAWN_RAINBOW ? 'rainbow' : roll < SPAWN_RAINBOW + SPAWN_GOLD ? 'gold' : null;
+      const d = this.makeDoll(rank, pool[Math.floor(Math.random() * pool.length)], sp);
       d.x = rand(WALL_X + 8 + d.r, RIGHT_X - 4 - d.r);
       d.y = 100;
       this.dolls.push(d);
@@ -1047,21 +1146,26 @@
     stageCleared = true;
     main.locked = true;
     main.celebrate();
+    if (d.special) main.say(`${SPECIALS[d.special].icon} ${SPECIALS[d.special].name} 인형! ×${specialMult(d)}`, { size: 32, y: 300, life: 1.6 });
     const boost = activeBoost();
     const mult = boost ? boost.mult : 1;
     const base = dollGems(d.rank);
-    const gems = base * mult;
+    const gems = base * specialMult(d) * mult;
     const clearedStage = save.stage;
     save.gems += gems;
     save.stage += 1;
+    const dex = recordCatch(d);
     persist();
     setTimeout(() => {
       $('clearTitle').textContent = `STAGE ${clearedStage} 클리어!`;
-      $('clearDollName').textContent = `${SIZE_NAMES[d.rank]} ${d.name} 획득!`;
+      $('clearDollName').textContent = `${specialLabel(d)}${SIZE_NAMES[d.rank]} ${d.name} 획득!`;
       const bonus = clearedStage - 1;
       let detail = [];
       if (bonus > 0) detail.push(`기본 ${BASE_GEMS[d.rank]} + 스테이지 보너스 ${bonus}`);
+      if (d.special) detail.push(`${SPECIALS[d.special].icon} ${SPECIALS[d.special].name} 인형 보석 ×${specialMult(d)}!`);
       if (mult > 1) detail.push(`🔥 보석 ×${mult} 부스트!`);
+      if (dex.isNew) detail.push(`📖 도감에 새로 등록! (${dexCount()} / ${KINDS.length})`);
+      if (dex.completed) detail.push(`🏆 도감 완성 보너스 +${DEX_BONUS} 💎`);
       $('clearReward').innerHTML = `+${gems} 💎` + detail.map(s => `<div class="sub">${s}</div>`).join('');
       const cc = $('clearDoll').getContext('2d');
       cc.clearRect(0, 0, 140, 140);
@@ -1096,8 +1200,8 @@
   function buildLegend() {
     const b = activeBoost();
     $('legendRows').innerHTML = main.dolls.filter(d => !d.gone).sort((a, b2) => a.rank - b2.rank).map(d =>
-      `<div class="row"><span class="dotbox"><span class="dot" style="width:${d.r * 0.7}px;height:${d.r * 0.7}px;background:${d.color}"></span></span>
-       <span>${SIZE_NAMES[d.rank]} ${d.name}</span><span class="gem">💎 ${dollGems(d.rank) * (b ? b.mult : 1)}${b ? ` <small style="color:#ff3d7f">×${b.mult}</small>` : ''}</span></div>`).join('');
+      `<div class="row"><span class="dotbox"><span class="dot" style="width:${d.r * 0.7}px;height:${d.r * 0.7}px;background:${d.special === 'rainbow' ? 'linear-gradient(135deg,#ff3d7f,#ffd23f,#2fb866,#4d8dff,#a77bff)' : d.color}"></span></span>
+       <span>${specialLabel(d)}${SIZE_NAMES[d.rank]} ${d.name}</span><span class="gem">💎 ${dollGems(d.rank) * specialMult(d) * (b ? b.mult : 1)}${b ? ` <small style="color:#ff3d7f">×${b.mult}</small>` : ''}</span></div>`).join('');
   }
   setInterval(updateHud, 250);
   $('soundBtn').onclick = () => { Sound.setOn(!save.sound); updateHud(); };
@@ -1109,7 +1213,7 @@
     $(id).classList.remove('hidden');
   }
   document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => $(b.dataset.close).classList.add('hidden'));
-  ['gachaModal', 'shopModal'].forEach(id => $(id).addEventListener('click', e => { if (e.target.id === id) $(id).classList.add('hidden'); }));
+  ['gachaModal', 'shopModal', 'dexModal'].forEach(id => $(id).addEventListener('click', e => { if (e.target.id === id) $(id).classList.add('hidden'); }));
 
   // ---------------- 상점 ----------------
   function renderShop() {
@@ -1250,6 +1354,7 @@
     battle.machines.forEach(m => m.silence());
     $('battleView').classList.add('hidden');
     hideOverlay();
+    setTimeout(checkAttendance, 300);
   }
   function showOverlay(html, block) {
     const o = $('bOverlay');
@@ -1260,9 +1365,15 @@
   function battleCatch(i, d) {
     const m = battle.machines[i];
     if (battle.phase !== 'play') { m.say('시간 초과! ⏰', { size: 30 }); return; }
-    battle.scores[i]++;
+    const pts = specialMult(d);
+    battle.scores[i] += pts;
     $('score' + i).textContent = battle.scores[i];
     m.celebrate();
+    if (d.special) m.say(`${SPECIALS[d.special].icon} ${SPECIALS[d.special].name} +${pts}점!`, { size: 36, y: 300, life: 1.6 });
+    const dex = recordCatch(d);
+    persist();
+    if (dex.completed) m.say(`🏆 도감 완성! +${DEX_BONUS}💎`, { size: 30, y: 360, life: 2.2 });
+    else if (dex.isNew) m.say('📖 도감 등록!', { size: 28, y: 360, life: 1.6 });
     m.spawns.push({ rank: d.rank, at: m.clock + 0.9 });
   }
   function updateBattle(dt) {
@@ -1307,13 +1418,13 @@
     if (gems > 0) { save.gems += gems; persist(); updateHud(); }
     const rewardHtml = gems > 0
       ? `<div class="reward">${win < 0 ? '둘 다 잘했어요!' : `${TEAM[win].name} 보상`} +${gems} 💎</div>
-         <div class="sub" style="margin:-8px 0 14px">${win < 0 ? '무승부 보상' : `승리 ${BATTLE_WIN_GEMS} + 뽑은 인형 ${battle.scores[win]}개 × ${BATTLE_GEMS_PER_DOLL}`}</div>`
+         <div class="sub" style="margin:-8px 0 14px">${win < 0 ? '무승부 보상' : `승리 ${BATTLE_WIN_GEMS} + 점수 ${battle.scores[win]}점 × ${BATTLE_GEMS_PER_DOLL}`}</div>`
       : `<div class="sub" style="margin-bottom:14px">인형을 뽑아야 보석을 받을 수 있어요!</div>`;
     Sound.fanfare();
     showOverlay(`<div class="panel result">
       <div style="font-size:52px">${win < 0 ? '🤝' : '🎉'}</div>
       <h2>${title}</h2>
-      <div class="fs"><span style="color:${TEAM[0].color}">핑크팀 ${a}개</span><span>:</span><span style="color:${TEAM[1].color}">블루팀 ${b}개</span></div>
+      <div class="fs"><span style="color:${TEAM[0].color}">핑크팀 ${a}점</span><span>:</span><span style="color:${TEAM[1].color}">블루팀 ${b}점</span></div>
       ${rewardHtml}
       <div class="btns">
         <button class="big-btn battle" id="again">다시 대결!</button>
@@ -1342,7 +1453,7 @@
       return;
     }
     if (isOpen('clearModal')) { if (down && e.code === 'Enter') $('nextStage').click(); return; }
-    if (isOpen('gachaModal') || isOpen('shopModal')) return;
+    if (isOpen('gachaModal') || isOpen('shopModal') || isOpen('dexModal') || isOpen('attModal')) return;
     const k = MAIN_KEYS[e.code];
     if (!k) return;
     e.preventDefault();
@@ -1367,7 +1478,95 @@
     requestAnimationFrame(loop);
   }
 
+  // ================= 인형 도감 =================
+  const dexCount = () => KINDS.filter(k => save.dex[k.name] && save.dex[k.name].n > 0).length;
+  function recordCatch(d) {
+    const e = save.dex[d.name] || (save.dex[d.name] = { n: 0, gold: 0, rainbow: 0 });
+    const isNew = e.n === 0;
+    e.n++;
+    if (d.special) e[d.special] = (e[d.special] || 0) + 1;
+    let completed = false;
+    if (!save.dexDone && dexCount() === KINDS.length) {
+      save.dexDone = true; save.gems += DEX_BONUS; completed = true;
+    }
+    return { isNew, completed };
+  }
+  function buildDex() {
+    const cnt = dexCount();
+    $('dexSub').textContent = save.dexDone
+      ? `🏆 도감 완성! 모든 인형을 모았어요 (${cnt} / ${KINDS.length})`
+      : `모은 인형 ${cnt} / ${KINDS.length} · 다 모으면 보석 +${DEX_BONUS} 💎`;
+    $('dexFill').style.width = `${(cnt / KINDS.length) * 100}%`;
+    const grid = $('dexGrid');
+    grid.innerHTML = '';
+    for (const k of KINDS) {
+      const e = save.dex[k.name];
+      const got = e && e.n > 0;
+      const cell = document.createElement('div');
+      cell.className = 'dcell' + (got ? '' : ' locked');
+      const badges = got ? [e.gold ? `✨${e.gold}` : '', e.rainbow ? `🌈${e.rainbow}` : ''].filter(Boolean).join(' ') : '';
+      cell.innerHTML = `<canvas width="140" height="140"></canvas>
+        <div>${got ? k.name : '???'}</div>
+        <div class="n">${got ? `${e.n}번 뽑음` : '아직 못 뽑았어요'}</div>
+        ${badges ? `<div class="bd">${badges}</div>` : ''}`;
+      const c = cell.querySelector('canvas').getContext('2d');
+      c.save(); c.translate(70, 80); c.scale(1.25, 1.25);
+      drawDoll(c, { r: 36, kind: k.kind, name: k.name, color: k.color, special: null }, 0, 0);
+      c.restore();
+      if (!got) {                                     // 그림자 실루엣
+        c.globalCompositeOperation = 'source-atop';
+        c.fillStyle = '#cbbfe0'; c.fillRect(0, 0, 140, 140);
+        c.globalCompositeOperation = 'source-over';
+      }
+      grid.appendChild(cell);
+    }
+  }
+  $('openDex').onclick = () => { buildDex(); openModal('dexModal'); };
+
+  // ================= 매일 출석 보상 =================
+  const dayStr = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  const todayStr = () => dayStr(new Date());
+  const yesterdayStr = () => { const d = new Date(); d.setDate(d.getDate() - 1); return dayStr(d); };
+  // 오늘 받을 차례인 날(1~7), 이미 받았으면 0
+  function attDay() {
+    const a = save.att;
+    if (a.last === todayStr()) return 0;
+    return a.last === yesterdayStr() ? (a.streak % 7) + 1 : 1;
+  }
+  function showAttendance() {
+    const day = attDay();
+    $('attSub').textContent = day > 1 ? `${day}일 연속 출석 중! 7일째엔 큰 선물이 있어요 🎉` : '7일 연속 출석하면 큰 선물이 있어요 🎉';
+    $('attGrid').innerHTML = ATT_REWARDS.map((g, i) => {
+      const n = i + 1;
+      const cls = ['att', n === 7 ? 'big' : '', n < day ? 'done' : '', n === day ? 'today' : ''].join(' ');
+      return `<div class="${cls}">${n}일차<div class="g">${n === 7 ? '🎁 ' : ''}💎${g}</div></div>`;
+    }).join('');
+    $('attClaim').disabled = false;
+    $('attClaim').textContent = `💎 ${ATT_REWARDS[day - 1]} 받기!`;
+    openModal('attModal');
+  }
+  function checkAttendance() {
+    if (attDay() && !isOpen('attModal') && !battle.active) showAttendance();
+  }
+  $('attClaim').onclick = () => {
+    const day = attDay();
+    if (!day) { $('attModal').classList.add('hidden'); return; }
+    const g = ATT_REWARDS[day - 1];
+    save.att = { last: todayStr(), streak: day };
+    save.gems += g;
+    persist();
+    if (day === 7) Sound.fanfare(); else Sound.coin();
+    $('attGrid').children[day - 1].className = 'att done' + (day === 7 ? ' big' : '');
+    $('attClaim').textContent = `+${g} 💎 받았어요! 내일 또 만나요 👋`;
+    $('attClaim').disabled = true;
+    updateHud();
+    setTimeout(() => $('attModal').classList.add('hidden'), 1600);
+  };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkAttendance(); });
+  setInterval(checkAttendance, 30000);              // 놀다가 자정이 지나도 받을 수 있게
+
   // ---------------- 시작 ----------------
+  setTimeout(checkAttendance, 500);
   newStage();
   requestAnimationFrame(loop);
 
