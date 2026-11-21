@@ -432,16 +432,21 @@
     { id: 'r3',  name: '초록 집게',       rar: 'R',   body: '#4fcf74', arm: '#2c9a4c', accent: '#c9f5d5' },
     { id: 'r4',  name: '노랑 집게',       rar: 'R',   body: '#ffd23f', arm: '#d9a300', accent: '#fff3c2' },
     { id: 'r5',  name: '보라 집게',       rar: 'R',   body: '#a77bff', arm: '#7444d6', accent: '#e4d6ff' },
+    { id: 'r6',  name: '주황 집게',       rar: 'R',   body: '#ffa04d', arm: '#e06a00', accent: '#ffe0c2' },
     { id: 'rr1', name: '딸기우유 집게',   rar: 'RR',  body: '#ffa3cb', arm: '#ff5f9e', accent: '#ffffff', fx: 'dots' },
     { id: 'rr2', name: '민트초코 집게',   rar: 'RR',  body: '#7fe3c9', arm: '#5b3a29', accent: '#3d2519', fx: 'dots' },
     { id: 'rr3', name: '노을 집게',       rar: 'RR',  body: '#ff9a3c', arm: '#ff4f7b', accent: '#ffe08a', fx: 'sunset' },
     { id: 'rr4', name: '솜사탕 구름 집게', rar: 'RR', body: '#cfe9ff', arm: '#ffb6e1', accent: '#ffffff', fx: 'dots' },
+    { id: 'rr5', name: '수박 집게',       rar: 'RR',  body: '#ff5a6e', arm: '#2c9a4c', accent: '#2b1f1f', fx: 'dots' },
     { id: 'br1', name: '황금 집게',       rar: 'BR',  body: '#ffd54a', arm: '#c99a00', accent: '#fff6c9', fx: 'glow', glow: '#ffe066' },
     { id: 'br2', name: '크리스탈 집게',   rar: 'BR',  body: '#bdf3ff', arm: '#7fd8f0', accent: '#ffffff', fx: 'crystal', glow: '#aef0ff' },
     { id: 'br3', name: '불꽃 집게',       rar: 'BR',  body: '#ff7a1a', arm: '#e62e00', accent: '#ffd36b', fx: 'fire', glow: '#ff6a00' },
+    { id: 'br4', name: '벚꽃 집게',       rar: 'BR',  body: '#ffc6dd', arm: '#ff8fbd', accent: '#ffffff', fx: 'sakura', glow: '#ffd1e6' },
     { id: 'sr1', name: '무지개 집게',     rar: 'SR',  body: '#ff0000', arm: '#ff0000', accent: '#ffffff', fx: 'rainbow' },
     { id: 'sr2', name: '번개 집게',       rar: 'SR',  body: '#26307a', arm: '#ffe23d', accent: '#ffe23d', fx: 'lightning', glow: '#7fe7ff' },
+    { id: 'sr3', name: '하트 집게',       rar: 'SR',  body: '#ff4f8b', arm: '#ff2d6f', accent: '#ffffff', fx: 'hearts', glow: '#ff8cb8' },
     { id: 'ssr1', name: '은하수 집게',    rar: 'SSR', body: '#2b1a5e', arm: '#4b2fa8', accent: '#ffe8ff', fx: 'galaxy', glow: '#b48cff' },
+    { id: 'ssr2', name: '왕관 집게',      rar: 'SSR', body: '#ffd23f', arm: '#d4a017', accent: '#fff6c9', fx: 'royal', glow: '#ffe680' },
   ];
   const skinById = id => SKINS.find(s => s.id === id) || SKINS[0];
 
@@ -695,6 +700,13 @@
     if (skin.fx === 'rainbow') return `hsl(${(t * 140 + (part === 'arm' ? 60 : 0)) % 360},95%,60%)`;
     return part === 'arm' ? skin.arm : skin.body;
   }
+  function heart(c, x, y, s) {
+    c.beginPath();
+    c.arc(x - s * 0.25, y, s * 0.27, Math.PI, 0);
+    c.arc(x + s * 0.25, y, s * 0.27, Math.PI, 0);
+    c.lineTo(x, y + s * 0.6);
+    c.closePath(); c.fill();
+  }
   function star(c, x, y, s) {
     c.beginPath();
     c.moveTo(x, y - s * 2); c.lineTo(x + s * 0.5, y - s * 0.5); c.lineTo(x + s * 2, y);
@@ -737,6 +749,9 @@
       case 'fire': bodyFill = lg(x, y + 10, x, y - 16, ['#ff2d00', '#ffb000']); break;
       case 'crystal': bodyFill = lg(x - 16, y - 16, x + 16, y + 10, ['#ffffff', '#bdf3ff', '#e3d4ff']); break;
       case 'lightning': bodyFill = lg(x - 16, y - 16, x + 16, y + 10, ['#1b2470', '#3a5bd9', '#1b2470']); break;
+      case 'sakura': bodyFill = lg(x, y - 16, x, y + 10, ['#fff0f6', '#ffc6dd', '#ff9cc6']); break;
+      case 'hearts': bodyFill = lg(x, y - 16, x, y + 10, ['#ff8cb8', '#ff4f8b', '#e0236a']); break;
+      case 'royal': bodyFill = lg(x - 16, y - 16, x + 16, y + 10, ['#fff1a8', '#ffd23f', '#d4a017', '#ffe680']); break;
       default: bodyFill = clawColor(skin, t, 'body');
     }
     c.fillStyle = bodyFill;
@@ -747,24 +762,58 @@
     c.fillStyle = skin.accent;
     if (skin.fx === 'dots') {
       for (const [dx, dy] of [[-8, -9], [5, -6], [-3, 2], [9, 3]]) { c.beginPath(); c.arc(x + dx, y + dy, 2.2, 0, Math.PI * 2); c.fill(); }
+    } else if (skin.fx === 'hearts') {
+      heart(c, x, y - 5, 12);
+    } else if (skin.fx === 'sakura') {
+      for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5 - Math.PI / 2; c.beginPath(); c.ellipse(x + Math.cos(a) * 4, y - 3 + Math.sin(a) * 4, 3, 2, a, 0, Math.PI * 2); c.fill(); }
+      c.fillStyle = '#ffd23f'; c.beginPath(); c.arc(x, y - 3, 1.8, 0, Math.PI * 2); c.fill();
     } else if (skin.fx === 'lightning') {
       c.beginPath(); c.moveTo(x + 2, y - 14); c.lineTo(x - 6, y - 3); c.lineTo(x, y - 3); c.lineTo(x - 3, y + 8); c.lineTo(x + 7, y - 6); c.lineTo(x + 1, y - 6); c.closePath(); c.fill();
     } else {
       c.fillRect(x - 11, y - 12, 22, 4);
     }
-    if (skin.fx !== 'lightning') {
+    if (skin.fx !== 'lightning' && skin.fx !== 'hearts' && skin.fx !== 'sakura') {
       c.beginPath(); c.arc(x, y + 1, 4, 0, Math.PI * 2);
       c.fillStyle = skin.rar ? RARITIES[skin.rar].color : '#ff5fa2'; c.fill();
     }
     c.globalAlpha = 1;
 
-    if (skin.fx === 'galaxy' || skin.fx === 'crystal' || skin.fx === 'glow' || skin.fx === 'rainbow') {
-      const n = skin.fx === 'galaxy' ? 6 : 3;
+    if (skin.fx === 'royal') {                       // 왕관
+      c.fillStyle = '#ffd23f'; c.strokeStyle = '#a8750a'; c.lineWidth = 1.5;
+      c.beginPath();
+      c.moveTo(x - 12, y - 15); c.lineTo(x - 14, y - 28); c.lineTo(x - 6, y - 21); c.lineTo(x, y - 31);
+      c.lineTo(x + 6, y - 21); c.lineTo(x + 14, y - 28); c.lineTo(x + 12, y - 15); c.closePath();
+      c.fill(); c.stroke();
+      [[-14, -28, '#ff3d7f'], [0, -31, '#4d8dff'], [14, -28, '#2fb866']].forEach(([dx, dy, col]) => {
+        c.fillStyle = col; c.beginPath(); c.arc(x + dx, y + dy, 2.6, 0, Math.PI * 2); c.fill();
+      });
+    }
+    if (skin.fx === 'sakura') {                      // 벚꽃잎 날림
+      for (let i = 0; i < 5; i++) {
+        const p = (t * 0.45 + i / 5) % 1;
+        const px = x + Math.sin(i * 2.7 + t * 1.8) * 28, py = y - 14 + p * 72;
+        c.save(); c.globalAlpha = 1 - p; c.translate(px, py); c.rotate(t * 2 + i);
+        c.fillStyle = i % 2 ? '#ffb3d1' : '#ffd6e7';
+        c.beginPath(); c.ellipse(0, 0, 4, 2.4, 0, 0, Math.PI * 2); c.fill();
+        c.restore();
+      }
+    }
+    if (skin.fx === 'hearts') {                      // 하트가 몽글몽글
+      for (let i = 0; i < 4; i++) {
+        const p = (t * 0.7 + i / 4) % 1;
+        c.globalAlpha = 1 - p;
+        c.fillStyle = i % 2 ? '#ff4f8b' : '#ffa3c6';
+        heart(c, x + Math.sin(i * 5 + t * 3) * 20, y - 10 - p * 34, 6 + 4 * (1 - p));
+      }
+      c.globalAlpha = 1;
+    }
+    if (skin.fx === 'galaxy' || skin.fx === 'crystal' || skin.fx === 'glow' || skin.fx === 'rainbow' || skin.fx === 'royal') {
+      const n = skin.fx === 'galaxy' || skin.fx === 'royal' ? 6 : 3;
       for (let i = 0; i < n; i++) {
         const a = t * (1.2 + i * 0.3) + i * 2.1;
         const px = x + Math.cos(a) * (22 + i * 3), py = y + 12 + Math.sin(a * 1.3) * 22;
         const sz = 1.5 + 1.5 * Math.abs(Math.sin(t * 4 + i));
-        c.fillStyle = skin.fx === 'galaxy' ? (i % 2 ? '#fff' : '#ffd6ff') : '#fff';
+        c.fillStyle = skin.fx === 'galaxy' ? (i % 2 ? '#fff' : '#ffd6ff') : skin.fx === 'royal' ? `hsl(${(t * 120 + i * 60) % 360},100%,72%)` : '#fff';
         star(c, px, py, sz);
       }
     }
@@ -1278,7 +1327,7 @@
       return;
     }
     c.translate(32, 0); c.scale(0.85, 0.85); c.translate(-32, 0);
-    drawClaw(c, 32, 30, 0.55 + Math.sin(t * 2) * 0.1, skin, t, 0);
+    drawClaw(c, 32, 34, 0.55 + Math.sin(t * 2) * 0.1, skin, t, 0);
   }
   function rollSkin() {
     const total = Object.values(RARITIES).reduce((a, r) => a + r.w, 0);
