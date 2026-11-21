@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>뽑기마스터</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ff5fa2">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="뽑기마스터">
 <style>
   :root {
     --bg1: #ffe3f1;
@@ -934,6 +941,11 @@
   // ---------------- 시작 ----------------
   newStage();
   requestAnimationFrame(loop);
+
+  // 앱으로 설치 & 오프라인 플레이
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 })();
 </script>
 </body>
